@@ -1,0 +1,74 @@
+name: build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  APP_ID: men.giuseppemacario.buonipasto
+  APP_NAME: BuoniPasto
+
+jobs:
+  macos-arm64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: true
+
+      - name: Install Fyne CLI (new tool)
+        run: |
+          go install fyne.io/tools/cmd/fyne@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Build macOS .app (arm64) with icon
+        run: |
+          go mod tidy
+          fyne package -os darwin -name "${APP_NAME}" -icon icon.png --app-id "${APP_ID}" -release
+
+      - name: Zip macOS app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "${APP_NAME}.app" "${APP_NAME}-macos-arm64.zip"
+
+      - name: Upload artifact (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BuoniPasto-macos-arm64-zip
+          path: BuoniPasto-macos-arm64.zip
+
+  windows-amd64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: true
+
+      - name: Install Fyne CLI (new tool)
+        shell: pwsh
+        run: |
+          go install fyne.io/tools/cmd/fyne@latest
+          "$((go env GOPATH))\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build Windows .exe (amd64) release with icon
+        shell: pwsh
+        run: |
+          go mod tidy
+          fyne package -os windows -name "$env:APP_NAME" -icon icon.png --app-id "$env:APP_ID" -release
+
+      - name: Zip Windows exe
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "$env:APP_NAME.exe" -DestinationPath "$env:APP_NAME-windows-amd64.zip" -Force
+
+      - name: Upload artifact (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BuoniPasto-windows-amd64-zip
+          path: BuoniPasto-windows-amd64.zip
